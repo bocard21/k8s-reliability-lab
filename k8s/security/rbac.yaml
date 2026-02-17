@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: techsafe-sa
+  namespace: techsafe
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: techsafe-role
+  namespace: techsafe
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: techsafe-rolebinding
+  namespace: techsafe
+subjects:
+  - kind: ServiceAccount
+    name: techsafe-sa
+    namespace: techsafe
+roleRef:
+  kind: Role
+  name: techsafe-role
+  apiGroup: rbac.authorization.k8s.io

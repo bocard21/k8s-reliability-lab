@@ -1,0 +1,7 @@
+Techsafe foi implantado com sucesso!
+
+Para verificar os pods:
+  kubectl get pods -n techsafe
+
+Para verificar os serviços:
+  kubectl get svc -n techsafe

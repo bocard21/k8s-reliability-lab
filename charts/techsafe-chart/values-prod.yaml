@@ -1,0 +1,16 @@
+global:
+  environment: production
+
+networkMonitor:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+securityAnalyzer:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi

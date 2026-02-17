@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: techsafe-db-backup
+  namespace: techsafe
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: db-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: db-backup
+              image: postgres:15
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="/backups/techsafe_backup_${TIMESTAMP}.sql"
+                  echo "Iniciando backup: ${TIMESTAMP}"
+                  PGPASSWORD=$DB_PASSWORD pg_dump \
+                    -h $DB_HOST \
+                    -U $DB_USER \
+                    -d $DB_NAME \
+                    -F c \
+                    -f $BACKUP_FILE
+                  if [ $? -eq 0 ]; then
+                    echo "Backup realizado com sucesso: $BACKUP_FILE"
+                    find /backups -name "*.sql" -mtime +30 -delete
+                  else
+                    echo "ERRO: Falha no backup!"
+                    exit 1
+                  fi
+              env:
+                - name: DB_HOST
+                  value: "techsafe-postgres"
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: techsafe-db-secret
+                      key: username
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: techsafe-db-secret
+                      key: password
+                - name: DB_NAME
+                  value: "techsafe_db"
+              volumeMounts:
+                - name: backup-volume
+                  mountPath: /backups
+          volumes:
+            - name: backup-volume
+              persistentVolumeClaim:
+                claimName: backup-storage

@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-network-monitor
+  labels:
+    app: network-monitor
+    {{- include "techsafe.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.networkMonitor.replicaCount }}
+  selector:
+    matchLabels:
+      app: network-monitor
+  template:
+    metadata:
+      labels:
+        app: network-monitor
+    spec:
+      containers:
+        - name: network-monitor
+          image: "{{ .Values.networkMonitor.image.repository }}:{{ .Values.networkMonitor.image.tag }}"
+          imagePullPolicy: {{ .Values.networkMonitor.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.networkMonitor.service.port }}
+          resources:
+            {{- toYaml .Values.networkMonitor.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.networkMonitor.livenessProbe | nindent 12 }}
+          env:
+            - name: DB_HOST
+              value: {{ .Release.Name }}-postgres
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.credentials.secretName }}
+                  key: password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-security-analyzer
+  labels:
+    app: security-analyzer
+    {{- include "techsafe.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.securityAnalyzer.replicaCount }}
+  selector:
+    matchLabels:
+      app: security-analyzer
+  template:
+    metadata:
+      labels:
+        app: security-analyzer
+    spec:
+      containers:
+        - name: security-analyzer
+          image: "{{ .Values.securityAnalyzer.image.repository }}:{{ .Values.securityAnalyzer.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.securityAnalyzer.service.port }}
+          resources:
+            {{- toYaml .Values.securityAnalyzer.resources | nindent 12 }}

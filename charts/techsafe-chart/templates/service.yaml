@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-network-monitor
+spec:
+  type: {{ .Values.networkMonitor.service.type }}
+  ports:
+    - port: {{ .Values.networkMonitor.service.port }}
+      targetPort: {{ .Values.networkMonitor.service.port }}
+  selector:
+    app: network-monitor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-security-analyzer
+spec:
+  type: {{ .Values.securityAnalyzer.service.type }}
+  ports:
+    - port: {{ .Values.securityAnalyzer.service.port }}
+      targetPort: {{ .Values.securityAnalyzer.service.port }}
+  selector:
+    app: security-analyzer
