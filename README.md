@@ -1,13 +1,13 @@
-# Techsafe - Segurança de Redes Corporativas
+# K8s Reliability Lab
 
-Aplicação baseada em microsserviços para monitorar e proteger redes corporativas.
+Projeto focado em práticas de SRE e DevOps utilizando:
 
-## Tecnologias
-- Kubernetes (Minikube)
+- Kubernetes
 - Helm
-- Istio
-- Docker
-- PostgreSQL
+- Istio (Service Mesh + mTLS)
+- Liveness / Readiness Probes
+- CronJob de Backup
+- Microsserviços
 
 ## Início Rápido
 ```bash
