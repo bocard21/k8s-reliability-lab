@@ -6,7 +6,7 @@ networkMonitor:
   enabled: true
   replicaCount: 2
   image:
-    repository: techsafe/network-monitor
+    repository: pbocard/network-monitor
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   service:
@@ -21,7 +21,7 @@ networkMonitor:
       memory: 256Mi
   livenessProbe:
     httpGet:
-      path: /health
+      path: /health/live
       port: 8080
     initialDelaySeconds: 30
     periodSeconds: 10
@@ -31,7 +31,7 @@ securityAnalyzer:
   enabled: true
   replicaCount: 2
   image:
-    repository: techsafe/security-analyzer
+    repository: pbocard/security-analyzer
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   service:

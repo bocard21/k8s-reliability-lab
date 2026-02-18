@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 
 app = Flask(__name__)
 
+@app.route("/health")
 @app.route("/health/live")
 def liveness():
     return jsonify({"status": "alive"}), 200
