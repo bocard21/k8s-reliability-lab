@@ -3,4 +3,4 @@ kind: Namespace
 metadata:
   name: techsafe
   labels:
-    istio-injection: enabled
+    name: techsafe

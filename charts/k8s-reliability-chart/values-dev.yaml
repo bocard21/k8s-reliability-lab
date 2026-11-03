@@ -14,3 +14,6 @@ securityAnalyzer:
     limits:
       cpu: 250m
       memory: 256Mi
+
+autoscaling:
+  enabled: false

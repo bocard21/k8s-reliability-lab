@@ -1,60 +1,61 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ .Release.Name }}-network-monitor
-  labels:
-    app: network-monitor
-    {{- include "techsafe.labels" . | nindent 4 }}
-spec:
-  replicas: {{ .Values.networkMonitor.replicaCount }}
-  selector:
-    matchLabels:
-      app: network-monitor
-  template:
-    metadata:
-      labels:
-        app: network-monitor
-    spec:
-      containers:
-        - name: network-monitor
-          image: "{{ .Values.networkMonitor.image.repository }}:{{ .Values.networkMonitor.image.tag }}"
-          imagePullPolicy: {{ .Values.networkMonitor.image.pullPolicy }}
-          ports:
-            - containerPort: {{ .Values.networkMonitor.service.port }}
-          resources:
-            {{- toYaml .Values.networkMonitor.resources | nindent 12 }}
-          livenessProbe:
-            {{- toYaml .Values.networkMonitor.livenessProbe | nindent 12 }}
-          env:
-            - name: DB_HOST
-              value: {{ .Release.Name }}-postgres
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.database.credentials.secretName }}
-                  key: password
+{{- range $name, $cfg := dict "network-monitor" .Values.networkMonitor "security-analyzer" .Values.securityAnalyzer }}
+{{- if $cfg.enabled }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-security-analyzer
+  name: {{ $.Release.Name }}-{{ $name }}
   labels:
-    app: security-analyzer
-    {{- include "techsafe.labels" . | nindent 4 }}
+    {{- include "techsafe.labels" $ | nindent 4 }}
 spec:
-  replicas: {{ .Values.securityAnalyzer.replicaCount }}
+  {{- if or (ne $name "network-monitor") (not $.Values.autoscaling.enabled) }}
+  replicas: {{ $cfg.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
-      app: security-analyzer
+      app: {{ $name }}
   template:
     metadata:
       labels:
-        app: security-analyzer
+        app: {{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
     spec:
+      serviceAccountName: techsafe-sa
       containers:
-        - name: security-analyzer
-          image: "{{ .Values.securityAnalyzer.image.repository }}:{{ .Values.securityAnalyzer.image.tag }}"
+        - name: {{ $name }}
+          image: "{{ $cfg.image.repository }}:{{ $cfg.image.tag }}"
+          imagePullPolicy: {{ $cfg.image.pullPolicy | default "IfNotPresent" }}
           ports:
-            - containerPort: {{ .Values.securityAnalyzer.service.port }}
+            - name: http
+              containerPort: {{ $cfg.service.port }}
           resources:
-            {{- toYaml .Values.securityAnalyzer.resources | nindent 12 }}
+            {{- toYaml $cfg.resources | nindent 12 }}
+          env:
+            - name: DB_HOST
+              value: {{ $.Release.Name }}-postgres
+            - name: DB_NAME
+              value: techsafe_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.credentials.secretName }}
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.credentials.secretName }}
+                  key: password
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+{{- end }}
+{{- end }}

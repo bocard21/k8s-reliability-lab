@@ -15,17 +15,22 @@ spec:
         metadata:
           labels:
             app: db-backup
+          annotations:
+            sidecar.istio.io/inject: "false"
         spec:
           restartPolicy: OnFailure
           containers:
             - name: db-backup
               image: postgres:15
+              resources:
+                requests: {cpu: 50m, memory: 64Mi}
+                limits: {cpu: 250m, memory: 256Mi}
               command:
                 - /bin/bash
                 - -c
                 - |
                   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-                  BACKUP_FILE="/backups/techsafe_backup_${TIMESTAMP}.sql"
+                  BACKUP_FILE="/backups/techsafe_backup_${TIMESTAMP}.dump"
                   echo "Iniciando backup: ${TIMESTAMP}"
                   PGPASSWORD=$DB_PASSWORD pg_dump \
                     -h $DB_HOST \
@@ -35,7 +40,7 @@ spec:
                     -f $BACKUP_FILE
                   if [ $? -eq 0 ]; then
                     echo "Backup realizado com sucesso: $BACKUP_FILE"
-                    find /backups -name "*.sql" -mtime +30 -delete
+                    find /backups -name "*.dump" -mtime +30 -delete
                   else
                     echo "ERRO: Falha no backup!"
                     exit 1

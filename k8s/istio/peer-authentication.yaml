@@ -5,4 +5,28 @@ metadata:
   namespace: techsafe
 spec:
   mtls:
+    mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: network-monitor-mtls
+  namespace: techsafe
+spec:
+  selector:
+    matchLabels:
+      app: network-monitor
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: security-analyzer-mtls
+  namespace: techsafe
+spec:
+  selector:
+    matchLabels:
+      app: security-analyzer
+  mtls:
     mode: STRICT
