@@ -13,11 +13,25 @@ spec:
         - namespaceSelector:
             matchLabels:
               name: techsafe
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
   egress:
     - to:
         - namespaceSelector:
             matchLabels:
               name: techsafe
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - port: 15012
+          protocol: TCP
     - ports:
         - port: 53
           protocol: UDP
+
+        - port: 53
+          protocol: TCP

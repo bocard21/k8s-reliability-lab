@@ -1,0 +1,78 @@
+name: Validate lab
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.19.0
+      - name: Shell syntax
+        run: for script in scripts/*.sh; do bash -n "$script" || exit; done
+      - name: Validate chart and manifests
+        run: |
+          pip install PyYAML pytest flask==3.0.0 psycopg2-binary==2.9.9
+          helm lint charts/k8s-reliability-chart --strict
+          helm template techsafe charts/k8s-reliability-chart --namespace techsafe -f charts/k8s-reliability-chart/values-dev.yaml > /tmp/lab-dev.yaml
+          helm template techsafe charts/k8s-reliability-chart --namespace techsafe -f charts/k8s-reliability-chart/values-prod.yaml > /tmp/lab-prod.yaml
+          python tests/check_manifests.py /tmp/lab-dev.yaml /tmp/lab-prod.yaml
+      - name: Dependency failure tests
+        run: pytest -q tests/test_readiness.py
+      - name: Build service images
+        run: |
+          docker build -t k8s-reliability/network-monitor:1.0.0 microservices/network-monitor
+          docker build -t k8s-reliability/security-analyzer:1.0.0 microservices/security-analyzer
+      - name: Create disposable Kubernetes cluster
+        run: |
+          curl --fail --location --retry 3 -o kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          curl --fail --location --retry 3 -o kind.sha256sum https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64.sha256sum
+          sed 's/kind-linux-amd64/kind/' kind.sha256sum | sha256sum --check
+          chmod +x kind
+          sudo mv kind /usr/local/bin/kind
+          kind create cluster --name reliability --wait 120s
+          kind load docker-image k8s-reliability/network-monitor:1.0.0 k8s-reliability/security-analyzer:1.0.0 --name reliability
+      - name: Deploy chart and test dependency recovery
+        run: |
+          kubectl apply -f k8s/base/namespace.yaml
+          kubectl apply -f k8s/base/
+          kubectl create secret generic techsafe-db-secret -n techsafe --from-literal=username=techsafe_user --from-literal=password="$(openssl rand -hex 24)"
+          kubectl apply -f k8s/security/
+          helm upgrade --install techsafe charts/k8s-reliability-chart -n techsafe -f charts/k8s-reliability-chart/values-dev.yaml --wait --timeout 300s
+          kubectl port-forward -n techsafe svc/techsafe-network-monitor 8080:8080 > /tmp/port-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://localhost:8080/health/ready
+          kubectl scale deployment techsafe-postgres -n techsafe --replicas=0
+          for attempt in $(seq 1 30); do
+            status=$(curl --silent --output /tmp/readiness.json --write-out '%{http_code}' http://localhost:8080/health/ready)
+            if [ "$status" = 503 ]; then break; fi
+            sleep 2
+          done
+          test "$status" = 503
+          curl --fail http://localhost:8080/health/live
+          kubectl scale deployment techsafe-postgres -n techsafe --replicas=1
+          kubectl rollout status deployment/techsafe-postgres -n techsafe --timeout=180s
+          kubectl wait --for=condition=Ready pod -l app=network-monitor -n techsafe --timeout=180s
+          curl --fail http://localhost:8080/health/ready
+      - name: Verify backup and isolated restore
+        run: |
+          kubectl apply -f k8s/backups/
+          bash scripts/backup-manual.sh
+          bash scripts/restore-check.sh
+      - name: Cluster diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,pvc,jobs -n techsafe -o wide || true
+          kubectl get events -n techsafe --sort-by=.metadata.creationTimestamp || true
+          kubectl logs -n techsafe -l app=network-monitor --all-containers=true || true
+          kubectl logs -n techsafe -l app=postgres --all-containers=true || true
+      - name: Remove disposable cluster
+        if: always()
+        run: kind delete cluster --name reliability

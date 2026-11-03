@@ -1,12 +1,12 @@
 global:
-  environment: production
+  environment: development
   imageRegistry: ""
 
 networkMonitor:
   enabled: true
   replicaCount: 2
   image:
-    repository: pbocard/network-monitor
+    repository: k8s-reliability/network-monitor
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   service:
@@ -31,7 +31,7 @@ securityAnalyzer:
   enabled: true
   replicaCount: 2
   image:
-    repository: pbocard/security-analyzer
+    repository: k8s-reliability/security-analyzer
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   service:
@@ -57,3 +57,9 @@ database:
   storage:
     size: 10Gi
     storageClass: standard
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70

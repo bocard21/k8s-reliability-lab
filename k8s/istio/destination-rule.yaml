@@ -4,7 +4,7 @@ metadata:
   name: techsafe-dr
   namespace: techsafe
 spec:
-  host: network-monitor
+  host: techsafe-network-monitor
   trafficPolicy:
     connectionPool:
       tcp:

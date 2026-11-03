@@ -1,19 +1,20 @@
-#!/bin/bash
-set -e
-echo "🚀 Iniciando Minikube..."
-minikube start --driver=docker --memory=4096 --cpus=2 --disk-size=20g
-
-echo "✅ Habilitando addons..."
-minikube addons enable ingress
+#!/usr/bin/env bash
+# shellcheck source=scripts/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+require minikube
+require kubectl
+require docker
+docker info >/dev/null
+minikube start --driver=docker --cni=calico --memory=6144 --cpus=4 --disk-size=20g
 minikube addons enable metrics-server
-
-echo "📦 Instalando Istio..."
-curl -L https://istio.io/downloadIstio | sh -
-export PATH="$PATH:$(ls -d istio-*/bin)"
-istioctl install --set profile=demo -y
-
-echo "🏗️ Criando namespace e recursos base..."
+kubectl apply -f k8s/base/namespace.yaml
 kubectl apply -f k8s/base/
-
-echo "✅ Cluster pronto!"
+# The default lab does not require a service mesh. Explicitly enable it if needed.
+if [[ "${ENABLE_ISTIO:-false}" == true ]]; then
+  require istioctl
+  istioctl install --set profile=demo -y
+  kubectl label namespace "$NAMESPACE" istio-injection=enabled --overwrite
+else
+  kubectl label namespace "$NAMESPACE" istio-injection=disabled --overwrite
+fi
 kubectl get nodes

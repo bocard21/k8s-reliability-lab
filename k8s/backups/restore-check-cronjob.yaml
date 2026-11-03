@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: techsafe-db-restore-check
+  namespace: techsafe
+spec:
+  schedule: "0 0 1 1 *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: db-restore-check
+          annotations:
+            sidecar.istio.io/inject: "false"
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: db-restore-check
+              image: postgres:15
+              resources:
+                requests: {cpu: 50m, memory: 64Mi}
+                limits: {cpu: 250m, memory: 256Mi}
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  export PGPASSWORD="$DB_PASSWORD"
+                  BACKUP_FILE=$(find /backups -name '*.dump' -type f | sort | tail -n 1)
+                  test -n "$BACKUP_FILE" || { echo "No backup found" >&2; exit 1; }
+                  CHECK_DB="restore_check_$(date +%s)"
+                  cleanup() { dropdb -h "$DB_HOST" -U "$DB_USER" --if-exists "$CHECK_DB"; }
+                  trap cleanup EXIT
+                  createdb -h "$DB_HOST" -U "$DB_USER" "$CHECK_DB"
+                  pg_restore -h "$DB_HOST" -U "$DB_USER" -d "$CHECK_DB" \
+                    --exit-on-error --no-owner --no-privileges "$BACKUP_FILE"
+                  psql -h "$DB_HOST" -U "$DB_USER" -d "$CHECK_DB" -v ON_ERROR_STOP=1 -c 'SELECT 1;'
+                  echo "Restore check passed in an isolated temporary database."
+              env:
+                - name: DB_HOST
+                  value: "techsafe-postgres"
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: techsafe-db-secret
+                      key: username
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: techsafe-db-secret
+                      key: password
+                - name: DB_NAME
+                  value: "techsafe_db"
+              volumeMounts:
+                - name: backup-volume
+                  mountPath: /backups
+          volumes:
+            - name: backup-volume
+              persistentVolumeClaim:
+                claimName: backup-storage
