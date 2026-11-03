@@ -4,6 +4,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 require kubectl
 require helm
 require minikube
+kubectl apply -f k8s/base/namespace.yaml
 kubectl apply -f k8s/base/
 if [[ "${ENABLE_ISTIO:-false}" == true ]]; then
   kubectl get crd peerauthentications.security.istio.io >/dev/null

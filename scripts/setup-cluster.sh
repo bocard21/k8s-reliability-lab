@@ -7,6 +7,7 @@ require docker
 docker info >/dev/null
 minikube start --driver=docker --cni=calico --memory=6144 --cpus=4 --disk-size=20g
 minikube addons enable metrics-server
+kubectl apply -f k8s/base/namespace.yaml
 kubectl apply -f k8s/base/
 # The default lab does not require a service mesh. Explicitly enable it if needed.
 if [[ "${ENABLE_ISTIO:-false}" == true ]]; then

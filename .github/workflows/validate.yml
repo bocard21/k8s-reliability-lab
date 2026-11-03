@@ -40,6 +40,7 @@ jobs:
           kind load docker-image k8s-reliability/network-monitor:1.0.0 k8s-reliability/security-analyzer:1.0.0 --name reliability
       - name: Deploy chart and test dependency recovery
         run: |
+          kubectl apply -f k8s/base/namespace.yaml
           kubectl apply -f k8s/base/
           kubectl create secret generic techsafe-db-secret -n techsafe --from-literal=username=techsafe_user --from-literal=password="$(openssl rand -hex 24)"
           kubectl apply -f k8s/security/
